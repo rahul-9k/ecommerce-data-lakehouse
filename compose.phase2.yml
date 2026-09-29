@@ -1,0 +1,34 @@
+# Only a local Spark process, not an Airflow deployment or a Spark cluster.
+services:
+  spark:
+    image: spark:4.0.4-python3
+    working_dir: /workspace
+    # Root is confined to this local container. No privileged mode or Docker socket.
+    # It avoids bind-mount write permission surprises in this Windows-first project.
+    user: "0:0"
+    cpus: 2.0
+    mem_limit: 4g
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SPARK_LOCAL_IP: "127.0.0.1"
+      PYSPARK_PYTHON: "/usr/bin/python3"
+      PYSPARK_DRIVER_PYTHON: "/usr/bin/python3"
+      PYTHONDONTWRITEBYTECODE: "1"
+      HOME: "/tmp"
+    volumes:
+      - ./src:/workspace/src:ro
+      - ./tests:/workspace/tests:ro
+      - ./data/raw:/workspace/data/raw:ro
+      - ./data/processed:/workspace/data/processed
+      - ./reports:/workspace/reports
+      - ./logs:/workspace/logs
+    entrypoint:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - local[2]
+      - --driver-memory
+      - 2g
+    command: [/workspace/src/run_phase2.py]

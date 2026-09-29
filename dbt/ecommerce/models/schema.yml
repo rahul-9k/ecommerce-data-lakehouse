@@ -1,0 +1,84 @@
+version: 2
+models:
+  - name: stg_products
+    description: "Catalogue snapshot with source metadata renamed for analytics."
+  - name: stg_customers
+    description: "Synthetic customers; one row per customer."
+  - name: stg_orders
+    description: "Order-header grain; order totals stay here, not repeated in the line fact."
+  - name: stg_order_items
+    description: "Typed transaction lines from PySpark with UTC order day."
+  - name: dim_customer
+    description: "One current-snapshot record per customer; no historical versioning."
+    columns:
+      - name: customer_key
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_tests: [not_null, unique]
+  - name: dim_product
+    description: "One record per product; catalogue price is not the transaction price."
+    columns:
+      - name: product_key
+        data_tests: [not_null, unique]
+      - name: product_id
+        data_tests: [not_null, unique]
+  - name: dim_date
+    description: "One record per calendar day between the first and last order, inclusive."
+    columns:
+      - name: date_key
+        data_tests: [not_null, unique]
+      - name: full_date
+        data_tests: [not_null, unique]
+  - name: fact_order_items
+    description: "Exactly one row per order item, including cancelled orders with their status."
+    columns:
+      - name: order_item_id
+        data_tests: [not_null, unique]
+      - name: order_id
+        data_tests: [not_null]
+      - name: customer_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_key
+      - name: product_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_key
+      - name: date_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: quantity
+        data_tests: [not_null]
+      - name: unit_price
+        data_tests: [not_null]
+      - name: line_amount
+        data_tests: [not_null]
+      - name: order_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [placed, shipped, delivered, cancelled]
+      - name: currency
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [USD]
+  - name: mart_daily_sales
+    description: "One row per order day and currency; order-value metrics, not booked revenue."
+    columns:
+      - name: order_day
+        data_tests: [not_null]
+      - name: currency
+        data_tests: [not_null]

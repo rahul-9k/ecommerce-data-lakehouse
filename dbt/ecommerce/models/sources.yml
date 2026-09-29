@@ -1,0 +1,22 @@
+version: 2
+sources:
+  - name: curated
+    description: "Immutable, validated Phase 2 snapshot loaded by Python; not external live transactions."
+    schema: "{{ var('landing_schema', 'landing') }}"
+    tables:
+      - name: products
+        columns:
+          - name: product_id
+            data_tests: [not_null, unique]
+      - name: customers
+        columns:
+          - name: customer_id
+            data_tests: [not_null, unique]
+      - name: orders
+        columns:
+          - name: order_id
+            data_tests: [not_null, unique]
+      - name: order_items
+        columns:
+          - name: order_item_id
+            data_tests: [not_null, unique]

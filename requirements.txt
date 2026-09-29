@@ -1,0 +1,2 @@
+# Phase 1 only. One direct dependency; compatible with the tested Requests 2.x API.
+requests>=2.32.5,<3

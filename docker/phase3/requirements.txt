@@ -1,0 +1,5 @@
+# Direct dependencies are pinned. Transitive dependencies are resolved by pip.
+pyarrow==21.0.0
+psycopg[binary]==3.2.10
+dbt-core==1.10.13
+dbt-postgres==1.9.1

@@ -1,0 +1,62 @@
+# Separate project from Phase 2. No host ports or Docker socket are published.
+name: ecommerce-phase3
+services:
+  warehouse:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PHASE3_ADMIN_PASSWORD:?Run python tools/init_phase3_env.py first}
+      PHASE3_APP_PASSWORD: ${PHASE3_APP_PASSWORD:?Run python tools/init_phase3_env.py first}
+      TZ: UTC
+    volumes:
+      - warehouse_pgdata:/var/lib/postgresql/data
+      - ./docker/phase3/init_db.sh:/docker-entrypoint-initdb.d/10-app-user.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U de_user -d ecommerce"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    cpus: 1.5
+    mem_limit: 1g
+    shm_size: 128mb
+    security_opt: ["no-new-privileges:true"]
+    networks: [warehouse_net]
+  warehouse-runner:
+    build:
+      context: ./docker/phase3
+    image: ecommerce-phase3-runner:1
+    environment:
+      PGHOST: warehouse
+      PGPORT: "5432"
+      PGDATABASE: ecommerce
+      PGUSER: de_user
+      PGPASSWORD: ${PHASE3_APP_PASSWORD:?Run python tools/init_phase3_env.py first}
+      PGCONNECT_TIMEOUT: "10"
+      PGOPTIONS: "-c timezone=UTC"
+      TZ: UTC
+      HOME: /tmp
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+      DBT_USE_COLORS: "false"
+      DBT_PARTIAL_PARSE: "false"
+    volumes:
+      - ./src:/workspace/src:ro
+      - ./tests:/workspace/tests:ro
+      - ./dbt/ecommerce:/workspace/dbt/ecommerce:ro
+      - ./data/processed:/workspace/data/processed:ro
+      - ./reports:/workspace/reports
+      - ./logs:/workspace/logs
+    cpus: 2.0
+    mem_limit: 1536m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [warehouse_net]
+    depends_on:
+      warehouse:
+        condition: service_healthy
+volumes:
+  warehouse_pgdata:
+networks:
+  warehouse_net:
+    internal: true

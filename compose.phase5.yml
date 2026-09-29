@@ -1,0 +1,136 @@
+# Merge with compose.phase3.yml. PostgreSQL warehouse remains private; only the
+# Airflow UI/API is exposed, and only on localhost:8080.
+x-airflow-environment: &airflow-environment
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+  AIRFLOW__CORE__FERNET_KEY: ${PHASE5_FERNET_KEY:?Run python tools/init_phase5_env.py first}
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin"
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/state/simple_auth_manager_passwords.json.generated
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${PHASE5_AIRFLOW_DB_PASSWORD:?Run python tools/init_phase5_env.py first}@airflow-db/airflow
+  AIRFLOW__API_AUTH__JWT_SECRET: ${PHASE5_JWT_SECRET:?Run python tools/init_phase5_env.py first}
+  AIRFLOW__API__SECRET_KEY: ${PHASE5_API_SECRET:?Run python tools/init_phase5_env.py first}
+  AIRFLOW__WORKERS__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+  AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+  AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "10"
+  AIRFLOW__LOGGING__COLORED_CONSOLE_LOG: "false"
+  AIRFLOW__METRICS__STATSD_ON: "false"
+  AIRFLOW_HOME: /opt/airflow
+  PYTHONPATH: /workspace
+  TZ: UTC
+  # Existing project warehouse credentials. They are injected at runtime, not stored in the DAG.
+  PGHOST: warehouse
+  PGPORT: "5432"
+  PGDATABASE: ecommerce
+  PGUSER: de_user
+  PGPASSWORD: ${PHASE3_APP_PASSWORD:?Keep the existing .env.phase3}
+  PGCONNECT_TIMEOUT: "10"
+  PGOPTIONS: "-c timezone=UTC"
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+  DBT_USE_COLORS: "false"
+  DBT_PARTIAL_PARSE: "false"
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: docker/phase5/Dockerfile
+  image: ecommerce-airflow:3.3.2-project
+  environment: *airflow-environment
+  user: "50000:0"
+  volumes:
+    - ./dags:/opt/airflow/dags:ro
+    - ./src:/workspace/src:ro
+    - ./tests:/workspace/tests:ro
+    - ./dbt/ecommerce:/workspace/dbt/ecommerce:ro
+    - ./data/changes:/workspace/data/changes
+    - ./reports:/workspace/reports
+    - ./logs:/workspace/logs
+    - airflow_logs:/opt/airflow/logs
+    - airflow_state:/opt/airflow/state
+  networks:
+    - airflow_net
+    - warehouse_net
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+    warehouse:
+      condition: service_healthy
+
+services:
+  airflow-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${PHASE5_AIRFLOW_DB_PASSWORD:?Run python tools/init_phase5_env.py first}
+      TZ: UTC
+    volumes:
+      - airflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt: ["no-new-privileges:true"]
+    networks: [airflow_net]
+
+
+  airflow-volume-init:
+    image: ecommerce-airflow:3.3.2-project
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >
+        mkdir -p /opt/airflow/logs /opt/airflow/state &&
+        chown -R 50000:0 /opt/airflow/logs /opt/airflow/state &&
+        chmod -R g+rwX /opt/airflow/logs /opt/airflow/state
+    volumes:
+      - airflow_logs:/opt/airflow/logs
+      - airflow_state:/opt/airflow/state
+    restart: "no"
+
+  airflow-init:
+    <<: *airflow-common
+    command: ["db", "migrate"]
+    restart: "no"
+
+  airflow-api-server:
+    <<: *airflow-common
+    command: ["api-server"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v2/monitor/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    mem_limit: 768m
+    cpus: 1.0
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["scheduler"]
+    mem_limit: 1024m
+    cpus: 1.5
+    restart: unless-stopped
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: ["dag-processor"]
+    mem_limit: 640m
+    cpus: 1.0
+    restart: unless-stopped
+
+volumes:
+  airflow_pgdata:
+  airflow_logs:
+  airflow_state:
+
+networks:
+  airflow_net:
+  # warehouse_net is defined by compose.phase3.yml and is intentionally internal.

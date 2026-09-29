@@ -1,0 +1,7 @@
+# Layer onto compose.phase3.yml: same database, volume, image and internal network.
+# No additional ports, software dependencies or privileged mounts.
+services:
+  warehouse-runner:
+    entrypoint: ["python", "/workspace/src/run_phase4.py"]
+    volumes:
+      - ./data/changes:/workspace/data/changes

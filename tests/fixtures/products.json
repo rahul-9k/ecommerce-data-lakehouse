@@ -1,0 +1,20 @@
+{
+  "fixture_note": "Handcrafted synthetic products for offline tests only. Not a captured DummyJSON response.",
+  "products": [
+    {"id": 1, "title": "Demo Keyboard", "category": "electronics", "price": 39.99},
+    {"id": 2, "title": "Demo Mouse", "category": "electronics", "price": 19.95},
+    {"id": 3, "title": "Demo Monitor", "category": "electronics", "price": 149.50},
+    {"id": 4, "title": "Demo Notebook", "category": "stationery", "price": 4.25},
+    {"id": 5, "title": "Demo Water Bottle", "category": "home", "price": 12.00},
+    {"id": 6, "title": "Demo Backpack", "category": "accessories", "price": 34.75},
+    {"id": 7, "title": "Demo Desk Lamp", "category": "home", "price": 24.90},
+    {"id": 8, "title": "Demo Headphones", "category": "electronics", "price": 59.99},
+    {"id": 9, "title": "Demo Pencil Set", "category": "stationery", "price": 6.50},
+    {"id": 10, "title": "Demo Coffee Mug", "category": "home", "price": 8.95},
+    {"id": 11, "title": "Demo Cable", "category": "electronics", "price": 7.49},
+    {"id": 12, "title": "Demo Desk Mat", "category": "accessories", "price": 15.00}
+  ],
+  "total": 12,
+  "skip": 0,
+  "limit": 12
+}
